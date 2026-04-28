@@ -52,7 +52,7 @@ class Nymeria(Sequence):
         self.data['acc'] = raw['imu_data']['accel']
         self.data['gyro'] = raw['imu_data']['gyro']
 
-        # Remove gravity from accelerometer
+        # Remove gravity from accelerometer (optional)
         gravity_vec = torch.tensor([0, -gravity, 0], dtype=self.data['acc'].dtype)
         gravity_vec = gravity_vec.expand(self.data['acc'].shape[0], -1)
 
@@ -71,6 +71,7 @@ class Nymeria(Sequence):
         self.data['gt_orientation'] = pp.SO3(orientation) if orientation.shape[-1] == 4 else orientation
         self.data['gt_translation'] = raw['gt_data']['position']
         self.data['velocity'] = raw['gt_data']['velocity'] # body-frame velocity
+        self.data['pose'] = raw['gt_data']['xsens_pose'] # pose
 
         # Mask (all valid)
         self.data['mask'] = torch.ones(len(time), dtype=torch.bool)        

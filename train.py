@@ -11,7 +11,7 @@ from datasets.dataset_motion import SeqeuncesMotionDataset
 from model.code import CodeNetMotionwithRot
 from model.losses import get_motion_loss, get_motion_RMSE
 from datasets.dataset_utils import collate_fcs
-from utils import move_to, save_state, cat_state
+from utils import move_to, save_state, cat_state, so3_log
 
 
 def train(network, loader, confs, epoch, optimizer):
@@ -25,7 +25,7 @@ def train(network, loader, confs, epoch, optimizer):
     t_range = tqdm(loader)
     for i, (data, _, label) in enumerate(t_range):
         data, label = move_to([data, label], confs.device)
-        rot = pp.SO3(label['gt_rot'][:, :-1, :]).Log().tensor()
+        rot = so3_log(label['gt_rot'][:, :-1, :])
 
         inte_state = network(data, rot)
         gt_label = network.get_label(label['gt_vel'])
@@ -56,7 +56,7 @@ def test(network, loader, confs):
         t_range = tqdm(loader)
         for i, (data, _, label) in enumerate(t_range):
             data, label = move_to([data, label], confs.device)
-            rot = pp.SO3(label['gt_rot'][:, :-1, :]).Log().tensor()
+            rot = so3_log(label['gt_rot'][:, :-1, :])
 
             inte_state = network(data, rot)
             gt_label = network.get_label(label['gt_vel'])
@@ -88,7 +88,7 @@ def evaluate(network, loader, confs):
     with torch.no_grad():
         for i, (data, _, label) in enumerate(tqdm(loader)):
             data, label = move_to([data, label], confs.device)
-            rot = pp.SO3(label['gt_rot'][:, :-1, :]).Log().tensor()
+            rot = so3_log(label['gt_rot'][:, :-1, :])
 
             inte_state = network(data, rot)
             gt_label = network.get_label(label['gt_vel'])
@@ -200,9 +200,9 @@ if __name__ == "__main__":
         scheduler.step(test_loss['loss'])
 
         # Save checkpoint
-        # is_best = test_loss < best_loss
-        # if is_best:
-            # best_loss = test_loss
+        is_best = test_loss['loss'] < best_loss
+        if is_best:
+            best_loss = test_loss['loss']
         # save_checkpoint(model, optimizer, scheduler, epoch, best_loss, ckpt_dir, is_best)
 
     print(f"\nTraining complete. Best loss: {best_loss:.6f}")

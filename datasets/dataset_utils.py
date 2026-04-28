@@ -1,5 +1,7 @@
 import torch
 import math
+
+
 def imu_seq_collate(data):
     acc = torch.stack([d["acc"] for d in data])
     gyro = torch.stack([d["gyro"] for d in data])

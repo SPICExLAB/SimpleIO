@@ -3,6 +3,7 @@ from .loss_func import loss_fc_list, diag_ln_cov_loss
 from utils import report_hasNan
 import numpy as np
 
+
 def motion_loss_(fc, pred, targ):
     dist = pred - targ
     loss = fc(dist)

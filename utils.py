@@ -6,7 +6,11 @@ from inspect import currentframe, getframeinfo
 import wandb
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
+import pypose as pp
 
+def so3_log(quat: torch.Tensor) -> torch.Tensor:
+    """Quaternion (..., 4) -> so(3) log map (..., 3) as a plain tensor."""
+    return pp.SO3(quat).Log().tensor()
 
 def save_state(out_states:dict, in_state:dict):
     for k, v in in_state.items():
