@@ -89,7 +89,6 @@ class CodeNetMotionwithRot(CodeNetMotion):
         
         self.gelu = nn.GELU()
 
-        
         self.veldecoder = nn.Sequential(nn.Linear(256, 128),nn.GELU(), nn.Linear(128, 3))
         self.velcov_decoder = nn.Sequential(nn.Linear(256, 128),nn.GELU(), nn.Linear(128, 3))
 

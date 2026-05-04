@@ -11,7 +11,7 @@ from datasets.dataset_motion import SeqeuncesMotionDataset
 from model.code import CodeNetMotionwithRot
 from model.losses import get_motion_loss, get_motion_RMSE
 from datasets.dataset_utils import collate_fcs
-from utils import move_to, save_state, cat_state, so3_log
+from utils import move_to, save_state, cat_state, so3_log, save_ckpt
 
 
 def train(network, loader, confs, epoch, optimizer):
@@ -127,7 +127,7 @@ def evaluate(network, loader, confs):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True, help="Config file path")
-    parser.add_argument("--device", type=str, default="cuda:0", help="Device")
+    parser.add_argument("--device", type=str, default="cuda:2", help="Device")
     parser.add_argument("--resume", action="store_true", help="Resume from checkpoint")
     args = parser.parse_args()
 
@@ -161,6 +161,13 @@ if __name__ == "__main__":
         num_workers=4,
         pin_memory=True,
     )
+    eval_loader = Data.DataLoader(
+        dataset=eval_dataset,
+        batch_size=conf.train.batch_size,
+        shuffle=False,
+        collate_fn=collate_fn_test,
+        drop_last=True,
+    )    
 
 
     # Load model 
@@ -197,12 +204,16 @@ if __name__ == "__main__":
         print(f"  Train loss: {train_loss['loss']:.6f}")
         print(f"  Test loss:  {test_loss['loss']:.6f}")
 
+        if epoch % conf.train.eval_freq == conf.train.eval_freq - 1: # doesn't trigger on first epoch (weird hack)
+            eval_state = evaluate(network=model, loader=eval_loader, confs=conf.train)
+            print(f"  Eval loss: {eval_state['loss']['loss'].mean():.6f}")
+
         scheduler.step(test_loss['loss'])
 
         # Save checkpoint
         is_best = test_loss['loss'] < best_loss
         if is_best:
             best_loss = test_loss['loss']
-        # save_checkpoint(model, optimizer, scheduler, epoch, best_loss, ckpt_dir, is_best)
+        save_ckpt(model, optimizer, scheduler, epoch, best_loss, conf, is_best)
 
     print(f"\nTraining complete. Best loss: {best_loss:.6f}")

@@ -4,6 +4,12 @@ IMUs suck. Writing code is hard. This repository serves as a one-stop shop to tr
 
 ### Train 
 
+```
+python train.py --config nymeria_small.conf
+```
+
 ### Evaluate
+
+
 
 ### Visualize
