@@ -41,8 +41,8 @@ if __name__ == '__main__':
     parser.add_argument('--load', type=str, default=None, help='path for specific model check point, Default is the best model')
     parser.add_argument("--device", type=str, default="cuda:0", help="cuda or cpu")
     parser.add_argument('--batch_size', type=int, default=1, help='batch size.')
-    parser.add_argument('--seqlen', type=int, default=1000, help='window size.')
-    parser.add_argument('--whole', default=True, action="store_true", help='estimate the whole seq')
+    parser.add_argument('--seqlen', type=int, default=250, help='window size for chunked inference')
+    parser.add_argument('--whole', default=False, action="store_true", help='estimate the whole seq in one shot (default: chunked)')
 
 
     args = parser.parse_args(); print(args)
@@ -84,10 +84,7 @@ if __name__ == '__main__':
         else:
             paths = list(data_conf.data_drive)
         for path in paths:
-            if args.whole:
-                dataset_conf["mode"] = "inference"
-            else:
-                dataset_conf["mode"] = "infevaluate"
+            dataset_conf["mode"] = "inference" if args.whole else "infevaluate"
             dataset_conf["exp_dir"] = conf.general.exp_dir
             eval_dataset = SeqeuncesMotionDataset(data_set_config=dataset_conf, data_path=path, data_root=data_conf["data_root"])
             eval_loader = Data.DataLoader(dataset=eval_dataset, batch_size=args.batch_size, 

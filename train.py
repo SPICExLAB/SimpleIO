@@ -127,7 +127,7 @@ def evaluate(network, loader, confs):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True, help="Config file path")
-    parser.add_argument("--device", type=str, default="cuda:2", help="Device")
+    parser.add_argument("--device", type=str, default="cuda:0", help="Device")
     parser.add_argument("--resume", action="store_true", help="Resume from checkpoint")
     args = parser.parse_args()
 

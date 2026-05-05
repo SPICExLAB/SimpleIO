@@ -77,7 +77,7 @@ class SeqDataset(Data.Dataset):
         frame_id, end_frame_id = self.index_map[i]
         return {
             "timestamp": self.data['time'][frame_id+1: end_frame_id+1],
-            "dt": self.data["dt"][frame_id:end_frame_id],
+            "dt": self.data["dt"][frame_id:end_frame_id, None],
             "acc": self.data["acc"][frame_id:end_frame_id],
             "gyro": self.data["gyro"][frame_id:end_frame_id],
             "rot": self.data["gt_orientation"][frame_id:end_frame_id],
@@ -157,7 +157,7 @@ class SeqInfDataset(SeqDataset):
             "acc_cov": self.data["acc_cov"][frame_id:end_frame_id] if "acc_cov" in self.data.keys() else None,
             "gyro_cov": self.data["gyro_cov"][frame_id:end_frame_id] if "gyro_cov" in self.data.keys() else None,
             "timestamp": self.data['time'][frame_id+1: end_frame_id+1],
-            "dt": self.data["dt"][frame_id:end_frame_id],
+            "dt": self.data["dt"][frame_id:end_frame_id, None],
             "acc": self.data["acc"][frame_id:end_frame_id],
             "gyro": self.data["gyro"][frame_id:end_frame_id],
             "rot": self.data["gt_orientation"][frame_id:end_frame_id],
