@@ -8,10 +8,24 @@ from tqdm import tqdm
 import pypose as pp
 
 from datasets.dataset_motion import SeqeuncesMotionDataset
-from model.code import CodeNetMotionwithRot
+from model.code import CodeNetMotion, CodeNetMotionwithRot
 from model.losses import get_motion_loss, get_motion_RMSE
 from datasets.dataset_utils import collate_fcs
 from utils import move_to, save_state, cat_state, so3_log, save_ckpt
+
+
+NETWORKS = {
+    "code":        CodeNetMotion,
+    "codewithrot": CodeNetMotionwithRot,
+}
+
+
+def _forward(network, data, label):
+    """Call network with rotation if it needs it, otherwise without."""
+    if isinstance(network, CodeNetMotionwithRot):
+        rot = so3_log(label['gt_rot'][:, :-1, :])
+        return network(data, rot)
+    return network(data)
 
 
 def train(network, loader, confs, epoch, optimizer):
@@ -25,9 +39,8 @@ def train(network, loader, confs, epoch, optimizer):
     t_range = tqdm(loader)
     for i, (data, _, label) in enumerate(t_range):
         data, label = move_to([data, label], confs.device)
-        rot = so3_log(label['gt_rot'][:, :-1, :])
 
-        inte_state = network(data, rot)
+        inte_state = _forward(network, data, label)
         gt_label = network.get_label(label['gt_vel'])
         loss_state = get_motion_loss(inte_state, gt_label, confs)
 
@@ -42,6 +55,8 @@ def train(network, loader, confs, epoch, optimizer):
 
         optimizer.zero_grad()
         loss_state["loss"].backward()
+        if confs.get("gradient_clip", None) is not None:
+            torch.nn.utils.clip_grad_norm_(network.parameters(), confs.gradient_clip)
         optimizer.step()
 
     return {"loss": losses / (i + 1), "cov": pred_cov / (i + 1)}
@@ -56,9 +71,8 @@ def test(network, loader, confs):
         t_range = tqdm(loader)
         for i, (data, _, label) in enumerate(t_range):
             data, label = move_to([data, label], confs.device)
-            rot = so3_log(label['gt_rot'][:, :-1, :])
 
-            inte_state = network(data, rot)
+            inte_state = _forward(network, data, label)
             gt_label = network.get_label(label['gt_vel'])
             loss_state = get_motion_RMSE(inte_state, gt_label, confs)
 
@@ -88,9 +102,8 @@ def evaluate(network, loader, confs):
     with torch.no_grad():
         for i, (data, _, label) in enumerate(tqdm(loader)):
             data, label = move_to([data, label], confs.device)
-            rot = so3_log(label['gt_rot'][:, :-1, :])
 
-            inte_state = network(data, rot)
+            inte_state = _forward(network, data, label)
             gt_label = network.get_label(label['gt_vel'])
             loss_state = get_motion_RMSE(inte_state, gt_label, confs)
 
@@ -127,7 +140,7 @@ def evaluate(network, loader, confs):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True, help="Config file path")
-    parser.add_argument("--device", type=str, default="cuda:0", help="Device")
+    parser.add_argument("--device", type=str, default="cuda:1", help="Device")
     parser.add_argument("--resume", action="store_true", help="Resume from checkpoint")
     args = parser.parse_args()
 
@@ -171,7 +184,11 @@ if __name__ == "__main__":
 
 
     # Load model 
-    model = CodeNetMotionwithRot(conf.train).to(device)
+    network_name = conf.train.get("network", "codewithrot")
+    if network_name not in NETWORKS:
+        raise ValueError(f"Unknown network '{network_name}'. Available: {list(NETWORKS)}")
+    print(f"Using network: {network_name}")
+    model = NETWORKS[network_name](conf.train).to(device)
     print(f"\nModel parameters: {sum(p.numel() for p in model.parameters()):,}")
 
     optimizer = torch.optim.Adam(

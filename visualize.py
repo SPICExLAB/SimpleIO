@@ -53,10 +53,10 @@ def plot_sequence(out_path, ts, pred_vel, gt_vel, pred_traj, gt_traj):
     traj_ax.legend(loc='upper left')
 
     metrics = (
-        f"ATE:    {ate:.2f} m\n"
-        f"ATE_V:  {ate_v:.2f} m\n"
-        f"ATE_H:  {ate_h:.2f} m\n"
-        f"Drift:  {drift_pct:.2f}%"
+        f"ATE:    {ate:>7.2f} m\n"
+        f"ATE_V:  {ate_v:>7.2f} m\n"
+        f"ATE_H:  {ate_h:>7.2f} m\n"
+        f"Drift:  {drift_pct:>7.2f}%"
     )
     traj_ax.text(0.98, 0.02, metrics, transform=traj_ax.transAxes,
                  ha='right', va='bottom', fontsize=14, family='monospace',

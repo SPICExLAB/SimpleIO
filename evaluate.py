@@ -29,7 +29,7 @@ def calculate_rte(outstate,duration, step_size):
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device", type=str, default="cpu", help="cuda or cpu")
+    parser.add_argument("--device", type=str, default="cuda:1", help="cuda or cpu")
     parser.add_argument("--exp", type=str, default="experiments/nymeria", help="Path for AirIO netoutput")
     parser.add_argument("--seqlen", type=int, default="1000", help="the length of the segment")
     parser.add_argument("--dataconf", type=str, default="configs/nymeria.conf", help="the configuration of the dataset")
@@ -101,7 +101,7 @@ if __name__ == '__main__':
                 motion_dataset = SeqDataset(data_conf.data_root, data_name, args.device, name = data_conf.name, duration=args.seqlen, step_size=args.seqlen, drop_last=False, conf = dataset_conf)
                 motion_loader = Data.DataLoader(dataset=motion_dataset, batch_size=1, collate_fn=imu_seq_collate, shuffle=False, drop_last=False)
             
-                inference_state = inference_state_load[data_name] 
+                inference_state = inference_state_load[data_name]
                 gt_ts =  motion_dataset.data['time']
                 vel_ts = inference_state['ts']
                 indices = torch.cat([torch.where(gt_ts == item)[0] for item in vel_ts[:,0]]).to(torch.int32)

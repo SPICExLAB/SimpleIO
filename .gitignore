@@ -173,6 +173,7 @@ dmypy.json
 
 #experiments
 experiments
+nymeria_dataset
 
 #wandb
 wandb

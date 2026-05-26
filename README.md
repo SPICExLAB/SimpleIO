@@ -5,11 +5,21 @@ IMUs suck. Writing code is hard. This repository serves as a one-stop shop to tr
 ### Train 
 
 ```
-python train.py --config nymeria_small.conf
+python train.py --config config/nymeria.conf
 ```
 
 ### Evaluate
+Generate results:
+```
+python inference_motion.py --config configs/nymeria.conf
+```
 
-
+Evaluate results
+```
+python evaluate.py --exp experiments/nymeria --dataconf configs/nymeria.conf --device cuda:1
+```
 
 ### Visualize
+```
+python visualize.py --dataconf configs/nymeria.conf --seq 0
+```
