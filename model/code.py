@@ -72,12 +72,12 @@ class CodeNetMotion(torch.nn.Module):
 class CodeNetMotionwithRot(CodeNetMotion):
     def __init__(self, conf):
         super().__init__(conf)
-        self.conf = conf    
+        self.conf = conf
         self.interval = 9
         self.k_list = [7, 7]
         self.padding_num = 3
         self.s_list = [3, 3]
-        
+
         self.feature_encoder = CNNEncoder(c_list=[6, 32, 64], k_list=self.k_list, s_list=self.s_list, p_list=[3,3])# (N,F/8,64)
         self.ori_encoder = CNNEncoder(c_list=[3, 32, 64], k_list=self.k_list, s_list=self.s_list, p_list=[3,3])# (N,F/8,64)
         self.gru1 = nn.GRU(input_size = 64, hidden_size =64, num_layers = 1, batch_first = True,bidirectional=True)
@@ -86,7 +86,7 @@ class CodeNetMotionwithRot(CodeNetMotion):
         self.batchnorm1 = torch.nn.BatchNorm1d(128)
         self.fcn2 = nn.Sequential(nn.Linear(128, 64))
         self.batchnorm2 = torch.nn.BatchNorm1d(64)
-        
+
         self.gelu = nn.GELU()
 
         self.veldecoder = nn.Sequential(nn.Linear(256, 128),nn.GELU(), nn.Linear(128, 3))
@@ -94,24 +94,92 @@ class CodeNetMotionwithRot(CodeNetMotion):
 
     def encoder(self, feature, ori):
         x1 = self.feature_encoder(feature.transpose(-1, -2)).transpose(-1, -2)
-        x2 = self.ori_encoder(ori.transpose(-1,-2)).transpose(-1, -2) 
+        x2 = self.ori_encoder(ori.transpose(-1,-2)).transpose(-1, -2)
         x = torch.cat([x1, x2], dim = -1)
-        
+
         x = self.fcn2(x)
         x = self.batchnorm2(x.transpose(-1,-2)).transpose(-1,-2)
         x = self.gelu(x)
         x, _ = self.gru1(x)
         x, _ = self.gru2(x)
         return x
-    
+
     def forward(self, data, rot=None):
         assert rot is not None
         feature = torch.cat([data["acc"], data["gyro"]], dim = -1)
         feature = self.encoder(feature, rot)
         net_vel = self.decoder(feature)
-   
+
         #covariance propagation
         cov = None
         if self.conf.propcov:
             cov = self.cov_decoder(feature)
         return {"cov": cov, 'net_vel': net_vel}
+
+
+class PoseNetMotionwithRot(CodeNetMotionwithRot):
+    """Head-IMU -> body pose (root-translated joint positions).
+
+    Same encoder as CodeNetMotionwithRot (acc/gyro CNN + rotation CNN +
+    GRUs); output head predicts 23*3 = 69-d joint positions instead of
+    3-d velocity. No covariance head.
+    """
+
+    NUM_JOINTS = 23
+    POSE_DIM = NUM_JOINTS * 3
+
+    def __init__(self, conf):
+        super().__init__(conf)
+        self.posedecoder = nn.Sequential(
+            nn.Linear(256, 128), nn.GELU(), nn.Linear(128, self.POSE_DIM)
+        )
+
+    def forward(self, data, rot=None):
+        assert rot is not None
+        feature = torch.cat([data["acc"], data["gyro"]], dim=-1)
+        feature = self.encoder(feature, rot)
+        net_pose = self.posedecoder(feature)
+        return {"net_pose": net_pose}
+
+
+class CodeNetMotionwithRotPose(CodeNetMotionwithRot):
+    """IMU + orientation + GT body pose (root-translated joint positions).
+
+    Pose enters as a third parallel CNN branch. Joint positions are
+    (N, 23, 3) flattened to 69 channels at the input.
+    """
+
+    POSE_CHANNELS = 23 * 3
+
+    def __init__(self, conf):
+        super().__init__(conf)
+        self.pose_encoder = CNNEncoder(
+            c_list=[self.POSE_CHANNELS, 64, 64],
+            k_list=self.k_list, s_list=self.s_list, p_list=[3, 3],
+        )
+        self.fcn2 = nn.Sequential(nn.Linear(192, 64))
+
+    def encoder(self, feature, ori, pose):
+        x1 = self.feature_encoder(feature.transpose(-1, -2)).transpose(-1, -2)
+        x2 = self.ori_encoder(ori.transpose(-1, -2)).transpose(-1, -2)
+        x3 = self.pose_encoder(pose.transpose(-1, -2)).transpose(-1, -2)
+        x = torch.cat([x1, x2, x3], dim=-1)
+
+        x = self.fcn2(x)
+        x = self.batchnorm2(x.transpose(-1, -2)).transpose(-1, -2)
+        x = self.gelu(x)
+        x, _ = self.gru1(x)
+        x, _ = self.gru2(x)
+        return x
+
+    def forward(self, data, rot=None):
+        assert rot is not None
+        assert "pose" in data, "CodeNetMotionwithRotPose requires data['pose']"
+        feature = torch.cat([data["acc"], data["gyro"]], dim=-1)
+        feature = self.encoder(feature, rot, data["pose"])
+        net_vel = self.decoder(feature)
+
+        cov = None
+        if self.conf.propcov:
+            cov = self.cov_decoder(feature)
+        return {"cov": cov, "net_vel": net_vel}

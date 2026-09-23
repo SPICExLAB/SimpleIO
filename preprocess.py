@@ -201,8 +201,8 @@ def process_sequence(seq_path: Path, out_dir: Path, skip_seconds: float = 30.0, 
     reference_time = float(t_traj[ref_idx])
 
     # find head orientation at reference time
-    R_dev_world_ref = Rotation.from_quat(q_traj_xyzw[ref_idx]).as_matrix()
-    R_cpf_world_ref = R_dev_world_ref @ R_dev_cpf_frames
+    R_dev_world_ref = Rotation.from_quat(q_traj_xyzw[ref_idx]).as_matrix()  # the device's orientation relative to SLAM-world (device -> world)
+    R_cpf_world_ref = R_dev_world_ref @ R_dev_cpf_frames                    # (device -> world) @ (CPF -> device): CPF -> world. 
 
     # forward = horizontal direction the wearer was facing at reference time
     fwd = R_cpf_world_ref[:, 2].copy()

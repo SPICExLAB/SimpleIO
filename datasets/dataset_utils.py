@@ -43,13 +43,17 @@ def custom_collate(data):
     init_rot = torch.stack([d["init_rot"] for d in data])
     init_vel = torch.stack([d["init_vel"] for d in data])
 
+    input_dict = {
+        "dt": dt,
+        "acc": acc,
+        "gyro": gyro,
+        "rot": rot,
+    }
+    if "pose" in data[0]:
+        input_dict["pose"] = torch.stack([d["pose"] for d in data])
+
     return (
-        {
-            "dt": dt,
-            "acc": acc,
-            "gyro": gyro,
-            "rot": rot,
-        },
+        input_dict,
         {
             "pos": init_pos,
             "vel": init_vel,
@@ -81,14 +85,18 @@ def motion_collate_data(data):
 
     dt = torch.stack([d['dt'] for d in data])
 
+    input_dict = {
+        'ts': timestamp,
+        "dt": dt,
+        "acc": acc,
+        "gyro": gyro,
+        "rot": rot,
+    }
+    if "pose" in data[0]:
+        input_dict["pose"] = torch.stack([d["pose"] for d in data])
+
     return (
-        {
-            'ts': timestamp,
-            "dt": dt,
-            "acc": acc,
-            "gyro": gyro,
-            "rot": rot,
-        },
+        input_dict,
         {
             "pos": init_pos,
             "vel": init_vel,
@@ -100,7 +108,7 @@ def motion_collate_data(data):
             "gt_rot": gt_rot,
         },
     )
-    
+
 def motion_collate(data, **kwargs):
     input_data, init_state, label = motion_collate_data(data)
     if len(kwargs) > 0:

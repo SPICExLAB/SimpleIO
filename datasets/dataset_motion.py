@@ -17,6 +17,7 @@ class SeqeuncesMotionDataset(SeqeuncesDataset):
         data_root=None,
         device="cuda:0",
     ):
+        self.pose = []
         super().__init__(
         data_set_config=data_set_config,
         mode=mode,
@@ -48,6 +49,8 @@ class SeqeuncesMotionDataset(SeqeuncesDataset):
         self.gt_pos.append(seq.data["gt_translation"][start_frame : end_frame + 1])
         self.gt_ori.append(seq.data["gt_orientation"][start_frame : end_frame + 1])
         self.gt_velo.append(seq.data["velocity"][start_frame : end_frame + 1])
+        if "pose" in seq.data:
+            self.pose.append(seq.data["pose"][start_frame:end_frame])
 
     def construct_index_map(self, conf, data_root, data_name, seq_id):
         seq = self.DataClass[conf.name](
@@ -103,6 +106,8 @@ class SeqeuncesMotionDataset(SeqeuncesDataset):
             'gyro':self.gyro[seq_id][frame_id: end_frame_id],
             'rot':self.gt_ori[seq_id][frame_id: end_frame_id]
         }
+        if seq_id < len(self.pose):
+            data['pose'] = self.pose[seq_id][frame_id: end_frame_id]
         init_state = {
             'init_rot':self.gt_ori[seq_id][frame_id][None, ...],
             'init_pos':self.gt_pos[seq_id][frame_id][None, ...],

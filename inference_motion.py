@@ -11,8 +11,20 @@ import tqdm
 from pyhocon import ConfigFactory
 
 from datasets import collate_fcs, SeqeuncesMotionDataset
-from model.code import CodeNetMotionwithRot
+from model.code import (
+    CodeNetMotion,
+    CodeNetMotionwithRot,
+    CodeNetMotionwithRotPose,
+    PoseNetMotionwithRot,
+)
 from utils import move_to, save_state, so3_log
+
+NETWORKS = {
+    "code":            CodeNetMotion,
+    "codewithrot":     CodeNetMotionwithRot,
+    "codewithrotpose": CodeNetMotionwithRotPose,
+    "posenetwithrot":  PoseNetMotionwithRot,
+}
 
 
 def inference(network, loader, confs):
@@ -51,7 +63,11 @@ if __name__ == '__main__':
     conf['device'] = args.device
     dataset_conf = conf.eval
 
-    network = CodeNetMotionwithRot(conf.train).to(args.device)
+    network_name = conf.train.get("network", "codewithrot")
+    if network_name not in NETWORKS:
+        raise ValueError(f"Unknown network '{network_name}'. Available: {list(NETWORKS)}")
+    print(f"Using network: {network_name}")
+    network = NETWORKS[network_name](conf.train).to(args.device)
     save_folder = os.path.join(conf.general.exp_dir, "evaluate")
     os.makedirs(save_folder, exist_ok=True)
 
@@ -89,11 +105,13 @@ if __name__ == '__main__':
             eval_dataset = SeqeuncesMotionDataset(data_set_config=dataset_conf, data_path=path, data_root=data_conf["data_root"])
             eval_loader = Data.DataLoader(dataset=eval_dataset, batch_size=args.batch_size, 
                                             shuffle=False, collate_fn=collate_fn, drop_last = False)
-            inference_state = inference(network=network, loader = eval_loader, confs=conf.train)    
-            if not "cov" in inference_state.keys():
-                    inference_state["cov"] = torch.zeros_like(inference_state["net_vel"])         
-            inference_state['ts'] = inference_state['ts']
-            inference_state['net_vel'] = inference_state['net_vel'][0] #TODO: batch size != 1
+            inference_state = inference(network=network, loader = eval_loader, confs=conf.train)
+            if isinstance(network, PoseNetMotionwithRot):
+                inference_state['net_pose'] = inference_state['net_pose'][0]  # TODO: batch size != 1
+            else:
+                if not "cov" in inference_state.keys():
+                    inference_state["cov"] = torch.zeros_like(inference_state["net_vel"])
+                inference_state['net_vel'] = inference_state['net_vel'][0]  # TODO: batch size != 1
             net_out_result[path] = inference_state
 
     net_result_path = os.path.join(conf.general.exp_dir, 'net_output.pickle')

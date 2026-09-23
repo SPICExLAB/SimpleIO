@@ -40,7 +40,7 @@ class Nymeria(Sequence):
         # Optionally downsample
         data_sampling_rate_hz = raw['imu_sampling_rate_hz']
         downsampling_rate = max(1, round(data_sampling_rate_hz / target_hz))
-        for key in ["time", "accel", "gyro", "orientation", "position", "velocity"]:
+        for key in ["time", "accel", "gyro", "orientation", "position", "velocity", "xsens_pose"]:
             if key in raw.get('imu_data', {}):
                 raw['imu_data'][key] = raw['imu_data'][key][::downsampling_rate]
             if key in raw.get('gt_data', {}):
@@ -70,7 +70,14 @@ class Nymeria(Sequence):
             gravity_vec = torch.tensor([0, -gravity, 0], dtype=self.data['acc'].dtype)
             gravity_vec = gravity_vec.expand(self.data['acc'].shape[0], -1)
             self.data['acc'] = self.data['acc'] + self.data['gt_orientation'].Inv() @ gravity_vec
-        # self.data['pose'] = raw['gt_data']['xsens_pose'] # pose
+
+        # Root-translated Xsens joint positions as (N, 69): pelvis pinned to origin,
+        # rotation kept in cpfworld. Used by pose-conditioned networks.
+        if 'xsens_pose' in raw.get('gt_data', {}):
+            xp = raw['gt_data']['xsens_pose']                  # (N, 23, 4, 4)
+            joint_pos = xp[..., :3, 3]                          # (N, 23, 3)
+            root_pos = joint_pos[:, 0:1, :]                     # (N, 1, 3)
+            self.data['pose'] = (joint_pos - root_pos).reshape(joint_pos.shape[0], -1).float()
 
         # Mask (all valid)
         self.data['mask'] = torch.ones(len(time), dtype=torch.bool)        
